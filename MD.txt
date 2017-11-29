@@ -1,0 +1,179 @@
+
+SELECT
+  gitarc.repo.name AS repository,
+  COUNT(gitarc.type) AS event_count,
+FROM
+  [bigquery-public-data:github_repos.languages] lang
+
+JOIN
+  [githubarchive:day.20161101] gitarc
+
+ON
+  lang.repo_name = gitarc.repo.name
+
+GROUP BY
+  repository
+
+SELECT
+  lang.language.name AS languago,
+  lang.repo_name AS repository
+
+FROM
+  [bigquery-public-data:github_repos.languages] lang
+
+JOIN
+  [githubarchive:day.20161101] gitarc
+
+ON
+  lang.repo_name = gitarc.repo.name
+
+GROUP BY
+  languago, repository
+
+ORDER BY
+  repository
+
+SELECT
+  gitarc.repo.name AS repository,
+  COUNT(gitarc.type) AS event_count, COUNT(gitarc.actor.login) AS actors_count
+FROM
+  [bigquery-public-data:github_repos.languages] lang
+
+JOIN
+  [githubarchive:day.20161101] gitarc
+
+ON
+  lang.repo_name = gitarc.repo.name
+
+GROUP BY
+  repository
+
+SELECT
+  gitarc.repo.name AS repository,
+  COUNT(gitarc.actor.login) AS actors_count,
+
+FROM
+  [bigquery-public-data:github_repos.languages] lang
+
+JOIN
+  [githubarchive:day.20161101] gitarc
+
+ON
+  lang.repo_name = gitarc.repo.name
+
+GROUP BY
+  repository
+
+1)кол-во репозиториев для языка
+2)кол-во людей для языка
+3)кол-во событий для языка
+
+languages
+(repo_name) 	- Название репозитория
+name 		- Язык программирования для данного репозитория.
+
+repo_info
+(name)PK	- Имя репозитория
+event_count	- Количество событий в данном репозитории
+actors-count	- Количество людей, участвовавших в событиях данного репозитория.
+
+1)SELECT
+  languages.name AS language,
+  COUNT(languages.repo_name)
+ AS repo_count
+FROM
+  languages
+
+JOIN
+  repo_info
+
+ON
+  name = repo_info.name
+
+GROUP BY
+  languago
+ORDER BY
+  repo_count DESC
+LIMIT 10 >> languages_list[]
+
+2)SELECT languages.name AS language, SUM(repo_info.events_count) 
+FROM
+  languages
+
+JOIN
+  repo_info
+
+ON
+  name = repo_info.name
+
+WHERE  languages.name in language_list
+GROUP BY
+  languago
+
+3)SELECT languages.name AS language, SUM(repo_info.actors_count) 
+FROM
+  languages
+
+JOIN
+  repo_info
+
+ON
+  name = repo_info.name
+
+WHERE  languages.name in language_list
+GROUP BY
+  languago
+
+Cущности:
+1)Репозиторий (содержит имя, количество людей, количество событий)
+2)Язык (Связывает Репозиторий и название языка)
+
+git_archive - формат данных.
+type		- Тип события
+(repo.name)	- Имя репозитория
+actor.name(id)	- Идентификатор (имя) Пользователя
+#id		- Идентификатор События
+#created_at 	- Время События
+
+
+Формат данных в Монго данных
+{
+  "_id":"ID",					//Идентификатор репозитория
+  "repo_name":"Имя репозитория",		//Название репозитория
+  "languages":["LANG1","LANG2","LANGN"],	//Языки, использующиеся в репозитории
+  "events":NUM,					//Количество событий в репозитории
+  "actors":NUM					//Количество людей в репозитории
+}
+
+Расчёт размера
+1)Максимальная длина названия языка - 24
+2)В среднем длина названия языка в символах - 5.65
+3)В среднем - 3.(3) языка для каждого репозитория указано
+4)Средняя длина названия репозитория - 21 символ
+5)Максимальная длина названия репозитория - 77 символ
+6)Для используемых чисел будет достаточно положительных целых чисел разрядности 16 бит
+
+В качестве кодировки используется UTF8, следовательно, мы используем 1 байт на символ.
+Для таблицы languages нам необходимо:
+101 байт на строку * 100 000 строк ~= 10,1 МБайт
+Для таблицы repo_info
+77+2+2 = 81 байт на строку * 30 000 ~= 2,43 Мбайт
+
+Общий размер: 12.53 МБайт.
+
+Монго:
+Размер среднестатистической записи - 147 байт согласно функции stats.
+Таким образом, размер всей коллекции из ~30 000 документов примерно будет равен
+147* 30 000 = 4 410 000 ~= 4.41 Мбайта.
+
+Таким образом, занимаемое МОНГО место приблизительно в 3 раза меньше.
+
+SQL: (за 1.1.2016)
+~100 000 в таблице languages
+~300 000 в таблице events
+~30 000 в таблице repo_info
+запрос к таблице из 100 000 * 30 000 строк.
+
+Mongo:
+~30 000 документов
+Запрос проходит по коллекции из 30 000 документов.
